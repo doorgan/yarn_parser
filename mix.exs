@@ -8,6 +8,7 @@ defmodule YarnParser.MixProject do
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       description: "A simple yarn.lock parser",
+      package: package(),
       deps: deps(),
       source_url: "https://github.com/doorgan/yarn_parser"
     ]
@@ -24,6 +25,13 @@ defmodule YarnParser.MixProject do
   defp deps do
     [
       {:nimble_parsec, "~> 0.6"}
+    ]
+  end
+
+  defp package() do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/doorgan/yarn_parser"}
     ]
   end
 end
