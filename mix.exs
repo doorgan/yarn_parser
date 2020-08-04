@@ -7,6 +7,7 @@ defmodule YarnParser.MixProject do
       version: "0.1.0",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
+      description: "A simple yarn.lock parser",
       deps: deps(),
       source_url: "https://github.com/doorgan/yarn_parser"
     ]
