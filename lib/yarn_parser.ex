@@ -1,6 +1,14 @@
 defmodule YarnParser do
+  @moduledoc """
+  A parser for Yarn lock files
+  """
+
   import NimbleParsec
 
+  @doc """
+  Parses a lock file
+  """
+  @spec parse(binary()) :: {:ok, map()} | {:error, String.t()}
   def parse(input) do
     case do_parse(input, context: [indent: 0]) do
       {:ok, tree, "", _, _, _} ->
@@ -19,6 +27,10 @@ defmodule YarnParser do
     end
   end
 
+  @doc """
+  Returns the version of a parsed lockfile
+  """
+  @spec get_version(map()) :: nil | integer()
   def get_version(%{"comments" => comments}) do
     result =
       Enum.find_value(comments, fn comment ->
