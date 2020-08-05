@@ -8,7 +8,7 @@ by adding `yarn_parser` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yarn_parser, "~> 0.1.0"}
+    {:yarn_parser, "~> 0.2.0"}
   ]
 end
 ```
@@ -16,16 +16,18 @@ end
 ## Usage
 
 ```elixir
-input =
-"""
-# Some comment
-key1, key2:
-  val1: true
-  subkey1:
-    val2: 123
-"""
+iex> input = 
+  """
+  # Some comment
+  # yarn lockfile v1
+  key1, key2:
+    val1 true
+    subkey1:
+      val2 123
+  """
 
-YarnParser.parse(input)
+iex> {:ok, parsed} = YarnParser.parse(input)
+parsed
 {:ok,
   %{
     "comments" => ["# Some comment"],
@@ -43,9 +45,12 @@ YarnParser.parse(input)
     }
   }
 }
+
+iex> YarnParser.get_version(parsed)
+1
 ```
 
 ## TODO
-[ ] Parse with merge conflicts
-[ ] Improve error messages
+- [ ] Parse with merge conflicts
+- [ ] Improve error messages
 

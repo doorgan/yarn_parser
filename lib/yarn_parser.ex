@@ -19,6 +19,19 @@ defmodule YarnParser do
     end
   end
 
+  def get_version(%{"comments" => comments}) do
+    result =
+      Enum.find_value(comments, fn comment ->
+        Regex.run(~r/yarn lockfile v(\d+)/, comment)
+      end)
+
+    case result do
+      nil -> nil
+      [_, version] -> String.to_integer(version)
+    end
+  end
+  def get_version(%{}), do: nil
+
   defp emit_map(tree, map \\ %{})
   defp emit_map([], map), do: map
   defp emit_map([{:comment, comment} | rest], map) do

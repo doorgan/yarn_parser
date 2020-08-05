@@ -121,6 +121,18 @@ defmodule YarnParserTest do
       assert {:error, _error} = YarnParser.parse(input)
   end
 
+  test "retrieves version" do
+    input =
+      """
+      # some comment
+      # yarn lockfile v1
+      # some other comment
+      """
+
+    assert {:ok, parsed} = YarnParser.parse(input)
+    assert YarnParser.get_version(parsed) == 1
+  end
+
   test "parses sample lock" do
     input =
       """
@@ -177,5 +189,6 @@ defmodule YarnParserTest do
         "resolved" => "https://registry.npmjs.org/package-4/-/package-4-2.6.3.tgz#a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
       }
     }
+    assert YarnParser.get_version(parsed) == 1
   end
 end
