@@ -1,14 +1,149 @@
 defmodule YarnParser do
   import NimbleParsec
 
+  def parse(input) do
+    case do_parse(input, context: [indent: 0]) do
+      {:ok, tree, "", _, _, _} ->
+        {:ok, emit_map(tree)}
+
+      {:ok, _, rest, context, {line, _}, byte_offset} ->
+        # Something went wrong then , however, because of repeat, the error is
+        # discarded, so we call do_parse again to get an error message.
+        {:error, message, _rest, _context, _, _byte_offset} =
+          do_parse(rest, context: context, line: line, byte_offset: byte_offset)
+
+        {:error, message}
+
+      {:error, message, _rest, _context, _, _byte_offset} ->
+        {:error, message}
+    end
+  end
+
+  defp emit_map(tree, map \\ %{})
+  defp emit_map([], map), do: map
+  defp emit_map([{:comment, comment} | rest], map) do
+    comment = List.to_string(comment)
+    map = Map.update(map, "comments", [comment], fn comments ->
+      [comment | comments] |> Enum.reverse()
+    end)
+    emit_map(rest, map)
+  end
+  defp emit_map([{:key_value, keyvalue} | rest], map) do
+    keys = Keyword.get(keyvalue, :keys)
+    [{_type, value}] = Keyword.get(keyvalue , :value)
+
+    map =
+      for {_type, key} <- keys, into: %{} do
+        {"#{key}", value}
+      end
+      |> Map.merge(map)
+
+    emit_map(rest, map)
+  end
+  defp emit_map([{:simple_block, block} | rest], map) do
+    keys = Keyword.get(block, :keys)
+    [{_type, value}] = Keyword.get(block , :value)
+
+    map =
+      for {_type, key} <- keys, into: %{} do
+        {"#{key}", value}
+      end
+      |> Map.merge(map)
+
+    emit_map(rest, map)
+  end
+  defp emit_map([{:block, block} | rest], map) do
+    keys = Keyword.get(block, :keys)
+    content = Keyword.get(block, :content) |> emit_map()
+
+    map =
+      for {_type, key} <- keys, into: %{} do
+        {"#{key}", content}
+      end
+      |> Map.merge(map)
+
+    emit_map(rest, map)
+  end
+
+  number =
+    integer(min: 1)
+    |> unwrap_and_tag(:number)
+    |> label("number")
+
+  boolean =
+    choice([
+      string("true") |> replace(true),
+      string("false") |> replace(false)
+    ])
+    |> unwrap_and_tag(:boolean)
+    |> label("boolean")
+
+  quoted_string =
+    ignore(utf8_char([?"]))
+    |> repeat(
+      lookahead_not(utf8_char([?"]))
+      |> utf8_char([])
+    )
+    |> ignore(utf8_char([?"]))
+
+  unquoted_string =
+    utf8_char([?a..?z, ?A..?Z, ?/, ?., ?-])
+    |> repeat(
+      lookahead_not(utf8_char([?:, ?\s, ?\n, ?\r, ?,]))
+      |> utf8_char([])
+    )
+
+  string =
+    choice([quoted_string, unquoted_string])
+    |> post_traverse(:emit_string)
+    |> unwrap_and_tag(:string)
+    |> label("string")
+
+  defp emit_string(_, string, context, _, _) do
+    string = Enum.reverse(string)
+    {[List.to_string(string)], context}
+  end
+
+  value =
+    choice([boolean, number, string])
+    |> tag(:value)
+
+  colon =
+    ascii_char([?:])
+    |> tag(:colon)
+    |> label("colon")
+
+  comma =
+    ascii_char([?,])
+    |> tag(:comma)
+    |> label("comma")
+
   newline =
     choice([
       concat(ascii_char([?\r]), ascii_char([?\n])),
       ascii_char([?\n, ?\r])
     ])
-    |> tag(:newline)
+    |> label("newline")
 
-  comment =
+  whitespace =
+    ascii_string([?\s], min: 0)
+    |> label("whitespace")
+
+  indent =
+    ascii_string([?\s], min: 0)
+    |> post_traverse(:process_indent)
+
+  defp process_indent(_, [spaces], context, _, _) do
+    len = String.length(spaces)
+    level = div(len, 2)
+    if rem(len, 2) > 0 do
+      {:error, "Invalid indentation, expected a multiple of 2, got #{len}"}
+    else
+      {[indent: level], context}
+    end
+  end
+
+  defcombinatorp :comment,
     ascii_char([?#])
     |> concat(
       repeat(
@@ -19,169 +154,111 @@ defmodule YarnParser do
     |> lookahead(newline)
     |> tag(:comment)
 
-  indent =
-    ascii_string([?\s], min: 1)
-    |> post_traverse({:process_indent, []})
-    |> tag(:indent)
-
-  defp process_indent(_rest, [indent], context, _line, _offset) do
-    len = String.length(indent)
-    level = div(len, 2)
-    block_level = Map.get(context, :block_level, 1)
-
-    if rem(len, 2) > 0 || level > block_level do
-      {:error, "Invalid indentation"}
-    else
-      context = if level < block_level do
-        Map.put(context, :block_level, block_level - 1)
-      end || context
-      {[{:indent, level}], context}
-    end
-  end
-
-  quoted_string =
-    ignore(ascii_char([?"]))
-    |> repeat(
-      lookahead_not(ascii_char([?"]))
-      |> utf8_char([])
-    )
-    |> ignore(ascii_char([?"]))
-
-  unquoted_string =
-    ascii_char([?a..?z, ?A..?Z, ?/, ?., ?-])
-    |> optional(repeat(
-      lookahead_not(ascii_char([?:, ?\s, ?\n, ?\r, ?,]))
-      |> ascii_char([])
-    ))
-
-  string =
-    choice([quoted_string, unquoted_string])
-    |> tag(:string)
-
-  number =
-    integer(min: 1)
-    |> unwrap_and_tag(:number)
-
-  boolean =
-    choice([
-      string("true"),
-      string("false")
-    ])
-    |> post_traverse({:parse_boolean, []})
-    |> unwrap_and_tag(:boolean)
-
-  value =
-    choice([boolean, number, string])
-    |> tag(:value)
-
-  defp parse_boolean(_, [text], context, _, _) do
-    bool = case text do
-      "true" -> true
-      "false" -> false
-    end
-    {[bool], context}
-  end
-
-  colon =
-    ascii_char([?:])
-    |> tag(:colon)
-
-  comma =
-    ascii_char([?,])
-    |> tag(:comma)
-
-  whitespace = ignore(ascii_char([?\s]))
-
   defcombinatorp :keysequence,
     choice([
       string
-      |> concat(ignore(comma))
-      |> optional(whitespace)
+      |> ignore(comma)
+      |> ignore(whitespace)
       |> concat(parsec(:keysequence)),
       string
     ])
 
   defcombinatorp :key,
     parsec(:keysequence)
-    |> tag(:key)
+    |> tag(:keys)
 
-  defcombinatorp :keyvalue,
+
+  defcombinatorp :key_value,
     parsec(:key)
-    |> optional(whitespace)
+    |> ignore(whitespace)
     |> concat(value)
-    |> optional(ignore(newline))
-    |> tag(:keyvalue)
+    |> tag(:key_value)
 
-  defcombinatorp :blockstart,
+  defcombinatorp :block_start,
     parsec(:key)
     |> ignore(colon)
-    |> ignore(newline)
-    |> post_traverse({:parse_blockstart, []})
-    |> tag(:block_key)
-
-  defp parse_blockstart(_, args, context, _, _) do
-    block_level = Map.get(context, :block_level, 1)
-    context = Map.put(context, :block_level, block_level + 1)
-    {args, context}
-  end
+    |> tag(:block_start)
 
   defcombinatorp :block,
-    parsec(:blockstart)
-    |> repeat(
+    parsec(:block_start)
+    |> ignore(newline)
+    |> post_traverse(:start_block)
+    |> repeat_while(
       indent
+      |> post_traverse(:remove_indent)
       |> choice([
         parsec(:block),
-        parsec(:keyvalue)
+        parsec(:key_value)
       ])
+      |> optional(ignore(newline)),
+      :not_dedent
     )
+    |> post_traverse(:end_block)
     |> tag(:block)
 
-  defparsec :parse_input,
-    repeat(choice([
-      parsec(:block),
-      parsec(:keyvalue),
-      comment,
-      ignore(newline)
-    ]))
+  defcombinatorp :simple_block,
+    parsec(:block_start)
+    |> ignore(newline)
+    |> concat(indent)
+    |> post_traverse(:remove_indent)
+    |> concat(value)
+    |> ignore(newline)
+    |> post_traverse(:emit_simple_block)
+    |> tag(:simple_block)
 
-  def parse(input) do
-    with {:ok, parsed, "", _, _, _} <- parse_input(input) do
-      {:ok, format(parsed)}
+  defp not_dedent(rest, context, _, _) do
+    indents = count_spaces(rest)
+    if indents < context.indent do
+      {:halt, context}
     else
-      _ -> {:error, :invalid_format}
+      {:cont, context}
     end
   end
 
-  defp format(elems) do
-    Enum.reduce(elems, %{}, fn
-      {:comment, value}, acc ->
-        value = List.to_string(value)
-        if Map.has_key?(acc, "comments") do
-          %{acc | "comments" => acc["comments"] ++ [value]}
-        else
-          Map.put(acc, "comments", [value])
-        end
-
-      {:indent, _}, acc -> acc
-
-      {:keyvalue, val}, acc ->
-        keys = Keyword.get(val, :key)
-
-        [value] = Keyword.get(val, :value)
-        for {_type, key} <- keys, into: %{} do
-          {"#{key}", format_value(value)}
-        end
-        |> Map.merge(acc)
-
-      {:block, subelems}, acc ->
-        [{:block_key, key: keys} | elems] = subelems
-        for {_type, key} <- keys, into: %{} do
-          {"#{key}", format(elems)}
-        end
-        |> Map.merge(acc)
-    end)
+  defp start_block(_, args, context, _, _) do
+    context = update_in(context.indent, &(&1 + 1))
+    {args, context}
+  end
+  defp end_block(_, args, context, _, _) do
+    {start, elements} = List.pop_at(args, -1)
+    {:block_start, [{:keys, keys}]} = start
+    context = update_in(context.indent, &(&1 - 1))
+    {[{:keys, keys}, content: elements], context}
   end
 
-  defp format_value({:string, val}), do: List.to_string(val)
-  defp format_value({_type, val}), do: val
+  defp emit_simple_block(_, block, context, _, _) do
+    value = Keyword.get(block, :value)
+    [{:keys, keys}] = Keyword.get(block, :block_start)
+    {[{:keys, keys}, value: value], context}
+  end
+
+  defp count_spaces(string, count \\ 0)
+  defp count_spaces(<<?\s, ?\s, rest::binary>>, count) do
+    count_spaces(rest, count + 1)
+  end
+  defp count_spaces(_, count) do
+    count
+  end
+
+  defparsecp :do_parse,
+    indent
+    |> post_traverse(:remove_indent)
+    |> choice([
+      parsec(:simple_block),
+      parsec(:block),
+      parsec(:comment),
+      parsec(:key_value),
+      ignore(newline)
+    ])
+    |> optional(ignore(newline))
+    |> times(min: 1)
+
+  defp remove_indent(_, args, context, _, _) do
+    args = args
+    |> Enum.reject(fn
+      {:indent, _} -> true
+      _ -> false
+    end)
+    {args, context}
+  end
 end

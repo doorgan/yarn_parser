@@ -26,20 +26,26 @@ key1, key2:
 """
 
 YarnParser.parse(input)
-%{
-  "comments" => ["# Some comment"],
-  "key1" => %{
-    "val1" => true,
-    "subkey1" => %{
-      "val2" => 123
-    }
-  },
-  "key2" => %{
-    "val1" => true,
-    "subkey1" => %{
-      "val2" => 123
+{:ok,
+  %{
+    "comments" => ["# Some comment"],
+    "key1" => %{
+      "val1" => true,
+      "subkey1" => %{
+        "val2" => 123
+      }
+    },
+    "key2" => %{
+      "val1" => true,
+      "subkey1" => %{
+        "val2" => 123
+      }
     }
   }
 }
 ```
+
+## TODO
+[ ] Parse with merge conflicts
+[ ] Improve error messages
 

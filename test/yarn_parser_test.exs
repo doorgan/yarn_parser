@@ -1,13 +1,49 @@
 defmodule YarnParserTest do
   use ExUnit.Case
 
-  test "parses comments" do
+  describe "parse files without merge conflicts" do
+    no_conflict_tests = [
+      {~s(foo:\n  bar\n), %{"foo" => "bar"}},
+      {~s(foo "bar"), %{"foo" => "bar"}},
+      {~s("foo" "bar"), %{"foo" => "bar"}},
+      {~s(foo:\n  bar "bar"), %{"foo" => %{"bar" => "bar"}}},
+      {~s(foo:\n  bar:\n  foo "bar"), %{"foo" => %{"bar" => %{}, "foo" => "bar"}}},
+      {~s(foo:\n  bar:\n    foo "bar"), %{"foo" => %{"bar" => %{"foo" => "bar"}}}},
+      {~s(foo:\r\n  bar:\r\n    foo "bar"), %{"foo" => %{"bar" => %{"foo" => "bar"}}}},
+      {~s(foo:\n  bar:\n    yes no\nbar:\n  yes no),
+       %{"foo" => %{"bar" => %{"yes" => "no"}}, "bar" => %{"yes" => "no"}}},
+      {~s(foo:\r\n  bar:\r\n    yes no\r\nbar:\r\n  yes no),
+       %{"foo" => %{"bar" => %{"yes" => "no"}}, "bar" => %{"yes" => "no"}}}
+    ]
+
+    Enum.each(no_conflict_tests, fn {input, result} ->
+      @input input
+      @result result
+
+      test "#{input}" do
+        {:ok, result} = YarnParser.parse(@input)
+        assert @result == result
+      end
+    end)
+  end
+
+  test "parses comment" do
     input =
       """
       # comment
       """
     assert {:ok, parsed} = YarnParser.parse(input)
     assert parsed == %{"comments" => ["# comment"]}
+  end
+
+  test "parses multiple comments" do
+    input =
+      """
+      # comment 1
+      # comment 2
+      """
+    assert {:ok, parsed} = YarnParser.parse(input)
+    assert parsed == %{"comments" => ["# comment 1", "# comment 2"]}
   end
 
   test "parses properties" do
@@ -48,17 +84,22 @@ defmodule YarnParserTest do
     input =
       """
       key0 val0
+      key_:
+        val_
       block1:
         key1 123
+
       block2:
         key2 321
         block2_1:
-          key2_1: true
+          key2_1 true
       block3:
-        key3: false
+        key3 false
       """
       assert {:ok, parsed} = YarnParser.parse(input)
       assert parsed == %{
+        "key0" => "val0",
+        "key_" => "val_",
         "block1" => %{"key1" => 123},
         "block2" => %{
           "key2" => 321,
@@ -68,6 +109,16 @@ defmodule YarnParserTest do
         },
         "block3" => %{"key3" => false}
       }
+  end
+
+  test "fails on bad indentation" do
+    input =
+      """
+      block:
+        good true
+         bad true
+      """
+      assert {:error, _error} = YarnParser.parse(input)
   end
 
   test "parses sample lock" do
