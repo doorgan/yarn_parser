@@ -23,6 +23,7 @@ defmodule YarnParser.Encoder do
     keys = Map.keys(map) |> sort_keys()
 
     {_, lines} = Enum.reduce(keys, {[], []}, fn
+      "comments", {pk, acc} -> {pk, acc}
       key, {processed_keys, acc} ->
         val = map[key]
         cond do

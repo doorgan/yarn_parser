@@ -44,7 +44,6 @@ defmodule YarnParser do
   """
   @spec encode(map(), keyword()) :: String.t()
   def encode(map, opts \\ []), do: Encoder.encode(map, opts)
-  %{"prop1" => 1,"block1" => %{"prop2" => true, "prop3" => %{"a" => "b"}, "prop4" => false}}
 
   @doc """
   Extracts the version from the comments on a parsed lockfile
