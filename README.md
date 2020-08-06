@@ -2,13 +2,13 @@
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
+[Available in Hex](https://hex.pm/packages/yarn_parser), the package can be installed
 by adding `yarn_parser` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:yarn_parser, "~> 0.2.0"}
+    {:yarn_parser, "~> 0.3.0"}
   ]
 end
 ```
@@ -30,7 +30,7 @@ iex> {:ok, parsed} = YarnParser.parse(input)
 parsed
 {:ok,
   %{
-    "comments" => ["# Some comment"],
+    "comments" => ["# Some comment", "# yarn lockfile v1],
     "key1" => %{
       "val1" => true,
       "subkey1" => %{
