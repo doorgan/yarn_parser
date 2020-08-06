@@ -38,7 +38,7 @@ defmodule YarnParser do
 
   ## Examples
       iex> map = %{"prop1" => 1,"block1" => %{"prop2" => true}}
-      iex> YarnParser.Encoder.encode(map, no_header: true)
+      iex> YarnParser.encode(map, no_header: true)
       "block1:\\n  prop2 true\\n\\nprop1 1"
 
   """
