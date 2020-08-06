@@ -26,7 +26,7 @@ iex> input =
       val2 123
   """
 
-iex> {:ok, parsed} = YarnParser.parse(input)
+iex> {:ok, parsed} = YarnParser.decode(input)
 parsed
 {:ok,
   %{
