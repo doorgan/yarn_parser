@@ -25,6 +25,7 @@ defmodule YarnParser.MixProject do
   defp deps do
     [
       {:nimble_parsec, "~> 0.6"},
+      {:yaml_elixir, "~> 2.5"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
