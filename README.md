@@ -28,18 +28,22 @@ iex> input =
 
 iex> {:ok, parsed} = YarnParser.decode(input)
 iex> parsed
-%{
-  "comments" => ["# Some comment", "# yarn lockfile v1"],
-  "key1" => %{
-    "val1" => true,
-    "subkey1" => %{
-      "val2" => 123
-    }
-  },
-  "key2" => %{
-    "val1" => true,
-    "subkey1" => %{
-      "val2" => 123
+%YarnParser.YarnLock{
+  metadata: %{
+    "version" => 1
+  }
+  dependencies: {
+    "key1" => %{
+      "val1" => true,
+      "subkey1" => %{
+        "val2" => 123
+      }
+    },
+    "key2" => %{
+      "val1" => true,
+      "subkey1" => %{
+        "val2" => 123
+      }
     }
   }
 }
@@ -61,4 +65,6 @@ key1, key2:
 ## TODO
 - [ ] Parse with merge conflicts
 - [ ] Improve error messages
+- [ ] Improve test suite
+- [ ] Implement encoder for v2 lockfiles
 

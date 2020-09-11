@@ -1,4 +1,4 @@
-defmodule YarnParser.Encoder do
+defmodule YarnParser.V1.Encoder do
   @moduledoc false
 
   def encode(map, opts \\ []) do
